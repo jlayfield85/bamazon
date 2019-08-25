@@ -1,74 +1,74 @@
 var mysql = require("mysql");
 var inquirer = require("inquirer");
-var Table = require("cli-table");
 
 var connection = mysql.createConnection({
 	host:"localhost",
-	port:3306,
+	port: 3306,
 	user:"root",
-	password:"",
-	database:"bamazon"
+	password:"Explorer98*!",
+	database:"bamazonDB"
 });
 
 connection.connect(function(err){
 	if(err)throw err;
-	console.log("connected as id" + connection.threadId);
+	console.log("connection has been made");
+	makeTable();
 });
 
-var displayProducts = function(){
-	var query = "Select * FROM products";
-	connection.query(query, function(err, res){
-		if(err) throw err;
-		var displayTable = new Table ({
-			head: ["Item ID", "Product Name", "Catergory", "Price", "Quantity"],
-			colWidths: [10,25,25,10,14]
-		});
-		for(var i = 0; i < res.length; i++){
-			displayTable.push(
-				[res[i].item_id,res[i].product_name, res[i].department_name, res[i].price, res[i].stock_quantity]
-				);
+var makeTable = function(){
+	connection.query("SELECT * FROM products", function(err, res){
+		for(var i = 0; i < res.length; i++) {
+			console.log(res[i].item_id+" || "+res[i].product_name + " || " +
+			res[i].department_name+ " || "+ res[i].price+" || "+res[i].stock_quantity+"\n");
 		}
-		console.log(displayTable.toString());
-		purchasePrompt();
-	});
+		promptCustomer(res);
+	})
 }
 
-function purchasePrompt(){
-	inquirer.prompt([
-	{
-		name: "ID",
-		type: "input",
-		message:"Please enter Item ID you like to purhcase.",
-		filter:Number
-	},
-	{
-		name:"Quantity",
-		type:"input",
-		message:"How many items do you wish to purchase?",
-		filter:Number
-	},
+var promptCustomer = function(res){
+	inquirer.prompt([{
+		type: 'input',
+		name: 'choice',
+		message: "What would you like to purchase today? [Quit with Q]"
+	}]).then(function(answer){
+		var correct = false;
+		if(answer.choice.toUpperCase()=Q){
+			process.exit();
+		}
+		for(var i = 0; i < res.length; i++){
+			if(res[i].product_name==answer.choice){
+				correct = true;
+				var product = answer.choice;
+				var id = i;
+				inquirer.prompt({
+					type: "input",
+					name: "quant",
+					message: "How many would like to buy purchase?",
+					validate: function(value){
+						if (isNan(value)==false){
+							return true;
+						} else {
+							return false;
+						}
+					}
 
- ]).then(function(answers){
- 	var quantityNeeded = answers.Quantity;
- 	var IDrequested = answers.ID;
- 	purchaseOrder(IDrequested, quantityNeeded);
- });
-};
+				}).then (function(answer){
+					if((res[id].stock_quantity-answer.quant)>0){
+						connection.query("UPDATE products set stock_quantity='"+(res[id].stock_quantity-answer.quant)+"' Where product_name='"+product+"'",function(err, res2){
+							console.log("Product bought!");
+							makeTable();
+						})
+					} else {
+						console.log("Not a valid selection.");
+						promptCustomer(res);
+					}
+				})
+			}
+		}
+		if(i==res.length && correct==false){
+			console.log("Not a valid selection.");
+			promptCustomer(res);
+		}
+	})
+}
 
-function purchaseOrder(ID, amtNeeded){
-	connection.query('Select * FROM products WHERE item_id = ' + ID, function(err,res){
-		if(err){console.log(err)};
-		if(amtNeeded <= res[0].stock_quantity){
-			var totalCost = res[0].price * amtNeeded;
-			console.log("Good news your order is in stock!");
-			console.log("Your total cost for " + amtNeeded + " " +res[0].product_name + " is " + totalCost + " Thank you!");
-
-			connection.query("UPDATE products SET stock_quantity = stock_quantity - " + amtNeeded + "WHERE item_id = " + ID);
-		} else{
-			console.log("Insufficient quantity, sorry we do not have enough " + res[0].product_name + "to complete your order.");
-		};
-		displayProducts();
-	});
-};
-
-displayProducts(); 
